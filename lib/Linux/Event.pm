@@ -4,8 +4,6 @@ use 5.008;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = '0.001';
-
 use Carp qw/croak/;
 use Const::Fast;
 use Hash::Util::FieldHash qw/fieldhash id_2obj/;
@@ -218,15 +216,9 @@ END {
 
 1;    # End of Linux::Event
 
+#ABSTRACT: A Linux specific high performance event loop
+
 __END__
-
-=head1 NAME
-
-Linux::Event - The Linux specific high performance event loop
-
-=head1 VERSION
-
-Version 0.001
 
 =head1 SYNOPSIS
 
@@ -266,52 +258,3 @@ This module is an expermental event loop for modern versions of Linux (2.6.27 or
 
 =back
 
-=head1 AUTHOR
-
-Leon Timmermans, C<< <leont at cpan.org> >>
-
-=head1 BUGS
-
-Please report any bugs or feature requests to C<bug-linux-event at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Linux-Event>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
-
-=head1 SUPPORT
-
-You can find documentation for this module with the perldoc command.
-
-    perldoc Linux::Event
-
-You can also look for information at:
-
-=over 4
-
-=item * RT: CPAN's request tracker
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Linux-Event>
-
-=item * AnnoCPAN: Annotated CPAN documentation
-
-L<http://annocpan.org/dist/Linux-Event>
-
-=item * CPAN Ratings
-
-L<http://cpanratings.perl.org/d/Linux-Event>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/Linux-Event/>
-
-=back
-
-=head1 LICENSE AND COPYRIGHT
-
-Copyright 2010 Leon Timmermans.
-
-This program is free software; you can redistribute it and/or modify it
-under the terms of either: the GNU General Public License as published
-by the Free Software Foundation; or the Artistic License.
-
-See http://dev.perl.org/licenses/ for more information.
-
-=cut

@@ -13,7 +13,7 @@ use Linux::FD qw/signalfd timerfd/;
 use POSIX qw/WNOHANG/;
 use POSIX::AtFork qw/pthread_atfork/;
 use Scalar::Util qw/refaddr weaken/;
-use Signal::Mask '%SIG_MASK';
+use Signal::Mask;
 
 use namespace::clean;
 
@@ -125,7 +125,7 @@ sub add_signal {
 		$cb->($arg) if defined $arg;
 	};
 	$epoll->add($signalfd, 'in', $callback);
-	$SIG_MASK{$signal} = 1;
+	$Signal::Mask{$signal} = 1;
 	$data_for_signal{$signal} = [ $signalfd, $callback ];
 	weaken $signalfd;
 	return $signal;
@@ -136,7 +136,7 @@ sub remove_signal {
 	return if not exists $data_for_signal{$signal};
 	my $data = delete $data_for_signal{$signal};
 	$epoll->remove($data->[0]);
-	$SIG_MASK{$signal} = 0;
+	$Signal::Mask{$signal} = 0;
 	return;
 }
 

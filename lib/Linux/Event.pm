@@ -8,8 +8,9 @@ use Carp qw/croak/;
 use Const::Fast;
 use Hash::Util::FieldHash qw/fieldhash id_2obj/;
 use Linux::Epoll;
-use Linux::Epoll::Util ':all';
 use Linux::FD qw/signalfd timerfd/;
+use List::Util qw/reduce/;
+use List::MoreUtils qw/uniq/;
 use POSIX qw/WNOHANG/;
 use POSIX::AtFork qw/pthread_atfork/;
 use Scalar::Util qw/refaddr weaken/;
@@ -28,7 +29,8 @@ fieldhash my %mode_for;
 
 my $reset_mode = sub {
 	my $fh = shift;
-	$mode_for{$fh} = reduce { our ($a, $b); $a | $b } grep { $_->[0] } values %{ $data_for_fh{$fh} };    ## no critic (Package)
+	#my @modes = ;
+	$mode_for{$fh} = [ uniq( map { @{ $_->[0] } } values %{ $data_for_fh{$fh} } ) ];
 };
 
 my $real_add = sub {
@@ -38,7 +40,7 @@ my $real_add = sub {
 		sub {
 			my $event = shift;
 			for my $callback (values %{ $data_for_fh{$fh} }) {
-				$callback->[1]->() if $callback->[0] & $event;
+				$callback->[1]->($event) if $event ~~ $callback->[0];
 			}
 		}
 	);
@@ -48,14 +50,14 @@ my $real_add = sub {
 sub add_fh {
 	my ($fh, $mode, $cb) = @_;
 	weaken $fh;
-	my $addr     = refaddr($cb);
-	my $modebits = event_names_to_bits($mode);
+	my $addr = refaddr($cb);
+	$mode = ref $mode ? $mode : [ $mode ];
 	if (!$data_for_fh{$fh}) {
 		$real_add->($fh, $mode);
-		$mode_for{$fh} = $modebits;
+		$mode_for{$fh} = $mode;
 	}
-	$data_for_fh{$fh}{$addr} = [ $modebits, $cb ];
-	$reset_mode->($fh) if $modebits != $mode_for{$fh};
+	$data_for_fh{$fh}{$addr} = [ $mode, $cb ];
+	$reset_mode->($fh) if [ sort @$mode ] ~~ [ sort @{$mode_for{$fh}} ];
 	return $addr;
 }
 
@@ -63,13 +65,12 @@ sub remove_fh {
 	my ($fh, $addr) = @_;
 	return if not delete $data_for_fh{$fh}{$addr};
 	if (not keys %{ $data_for_fh{$fh} }) {
-		$epoll->remove($fh);
+		$epoll->delete($fh);
 		delete $data_for_fh{$fh};
 	}
 	return;
 }
 
-my %timerfd_for;
 my %data_for_timer;
 
 sub add_timer {
@@ -80,26 +81,25 @@ sub add_timer {
 	$timer->blocking(0);
 	$timer->set_timeout($after, $interval);
 
-	my $addr     = refaddr($timer);
+	my $addr     = refaddr $timer;
 	my $callback = sub {
-		my $arg = $timer->wait;
+		my $data = $data_for_timer{$addr};
+		my $arg = $data->[0]->wait;
 		if (defined $arg) {
-			my $data = $data_for_timer{$addr};
 			$cb->($arg);
-			remove_timer($addr) if not $data->[2] and not $data->[4];
+			remove_timer($addr) if not $data->[2] and not $data->[3];
 		}
 	};
 	$epoll->add($timer, 'in', $callback);
-	$data_for_timer{$addr} = [ $timer, $after, $interval, $callback, $keepalive ];
-	weaken $timer;
+	$data_for_timer{$addr} = [ $timer, $after, $interval, $keepalive ];
 
 	return $addr;
 }
 
 sub remove_timer {
 	my $addr = shift;
-	return if not exists $timerfd_for{$addr};
-	my $data = delete $timerfd_for{$addr};
+	return if not exists $data_for_timer{$addr};
+	my $data = delete $data_for_timer{$addr};
 	$epoll->remove($data->[0]);
 	return;
 }
@@ -117,11 +117,11 @@ my %data_for_signal;
 
 sub add_signal {
 	my ($signal, $cb) = @_;
-	croak '$signal must be a number' if ref $signal;
+	croak '$signal must be a name or a POSIX::SigSet object' if ref $signal and not $signal->isa('POSIX::SigSet');
 	my $signalfd = signalfd($signal);
 	$signalfd->blocking(0);
 	my $callback = sub {
-		my $arg = $signalfd->receive;
+		my $arg = $data_for_signal{$signal}->receive;
 		$cb->($arg) if defined $arg;
 	};
 	$epoll->add($signalfd, 'in', $callback);
@@ -140,17 +140,21 @@ sub remove_signal {
 	return;
 }
 
-my $rebuild = sub {
+sub CLONE {
+	$epoll->close or die;
 	$epoll = Linux::Epoll->new;
 	for my $key (keys %data_for_fh) {
 		my $fh   = id_2obj($key);
 		my $mode = event_bits_to_names($mode_for{$fh});
 		$real_add->($fh, $mode);
 	}
-	for my $addr (keys %timerfd_for) {
+	for my $addr (keys %data_for_timer) {
 	}
 	for my $signame (keys %data_for_signal) {
-		my ($signalfd, $callback) = @{ $data_for_signal{$signame} };
+		my (undef, $callback, $signal) = @{ $data_for_signal{$signame} };
+		my $signalfd = signalfd($signame);
+		$signalfd->blocking(0);
+		$data_for_signal{$signame}[0] = $signalfd;
 		$epoll->add($signalfd, 'in', $callback);
 	}
 };
@@ -171,7 +175,7 @@ sub remove_child {
 
 my $child_handler = sub {
 	while ((my $pid = waitpid $any_child, WNOHANG) > $no_child) {
-		(delete $child_handler_for{$pid})->() if $child_handler_for{$pid};
+		(delete $child_handler_for{$pid})->() if exists $child_handler_for{$pid};
 	}
 	return;
 };
@@ -195,8 +199,8 @@ sub remove_idle {
 
 sub one_shot {
 	my $number = shift || 1;
-	while (keys %idle_handlers) {
-		for my $handler (values %idle_handlers) {
+	while (%idle_handlers) {
+		while (my (undef, $handler) = each %idle_handlers) {
 			my $ret = $epoll->wait($number, 0);
 			return $ret if $ret;
 			$handler->();
@@ -205,9 +209,9 @@ sub one_shot {
 	return $epoll->wait($number);
 }
 
-sub CLONE {
-	$rebuild->();
-	return;
+sub maybe_shot {
+	my $number = shift || 1;
+	return $epoll->wait($number, 0);
 }
 
 END {

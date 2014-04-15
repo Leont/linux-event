@@ -5,7 +5,6 @@ use strict;
 use warnings FATAL => 'all';
 
 use Carp qw/croak/;
-use Const::Fast;
 use Hash::Util::FieldHash qw/fieldhash id_2obj/;
 use Linux::Epoll;
 use Linux::FD qw/signalfd timerfd/;
@@ -20,9 +19,9 @@ use namespace::clean;
 
 my $epoll = Linux::Epoll->new;
 
-const my $waitbuffer_size => 16;
-const my $any_child       => -1;
-const my $no_child        => -1;
+my $waitbuffer_size = 16;
+my $any_child       = -1;
+my $no_child        = 0;
 
 fieldhash my %data_for_fh;
 fieldhash my %mode_for;

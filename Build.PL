@@ -9,7 +9,7 @@ if ($^O ne 'linux') {
 }
 
 my $builder = Module::Build->new(
-	module_name => 'Linux::Epoll',
+	module_name => 'Linux::Event',
 	##{ $plugin->get_prereqs ##}
 	##{ $plugin->get_default('share_dir') ##}
 );

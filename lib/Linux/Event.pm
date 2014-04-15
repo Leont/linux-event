@@ -29,14 +29,9 @@ fieldhash my %mode_for;
 
 my $reset_mode = sub {
 	my $fh = shift;
-	#my @modes = ;
 	$mode_for{$fh} = [ uniq( map { @{ $_->[0] } } values %{ $data_for_fh{$fh} } ) ];
-};
-
-my $real_add = sub {
-	my ($fh, $mode) = @_;
-	$epoll->add(
-		$fh, $mode,
+	$epoll->modify(
+		$fh, $mode_for{$fh},
 		sub {
 			my $event = shift;
 			for my $callback (values %{ $data_for_fh{$fh} }) {
@@ -47,17 +42,47 @@ my $real_add = sub {
 	return;
 };
 
+my $real_add = sub {
+	my ($fh, $mode) = @_;
+	my %data;
+	$epoll->add(
+		$fh, $mode,
+		sub {
+			my $event = shift;
+			for my $callback (values %data) {
+				$callback->[1]->($event) if $event ~~ $callback->[0];
+			}
+		}
+	);
+	return \%data;
+};
+
 sub add_fh {
 	my ($fh, $mode, $cb) = @_;
 	weaken $fh;
 	my $addr = refaddr($cb);
+	my @mode = ref $mode ? sort @$mode : $mode;
+	if (!exists $data_for_fh{$fh}) {
+		$data_for_fh{$fh} = $real_add->($fh, \@mode);
+		$data_for_fh{$fh}{$addr} = [ \@mode, $cb ];
+		weaken $data_for_fh{$fh};
+		$mode_for{$fh} = \@mode;
+	}
+	else {
+		$data_for_fh{$fh}{$addr} = [ \@mode, $cb ];
+		$reset_mode->($fh) unless join(',', @$mode) eq join(',', @{ $mode_for{$fh} });
+	}
+	return $addr;
+}
+
+sub modify_fh {
+	my ($fh, $addr, $mode, $cb) = @_;
 	$mode = ref $mode ? $mode : [ $mode ];
-	if (!$data_for_fh{$fh}) {
-		$real_add->($fh, $mode);
-		$mode_for{$fh} = $mode;
+	if (! exists $data_for_fh{$fh} || ! exists $data_for_fh{$fh}{$addr}) {
+		croak "Can't modify $addr: no such entry";
 	}
 	$data_for_fh{$fh}{$addr} = [ $mode, $cb ];
-	$reset_mode->($fh) if [ sort @$mode ] ~~ [ sort @{$mode_for{$fh}} ];
+	$reset_mode->($fh) unless join(',', @$mode) eq join(',', @{ $mode_for{$fh} });
 	return $addr;
 }
 

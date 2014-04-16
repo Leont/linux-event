@@ -11,7 +11,6 @@ use Linux::FD qw/signalfd timerfd/;
 use List::Util qw/reduce/;
 use List::MoreUtils qw/uniq/;
 use POSIX qw/WNOHANG/;
-use POSIX::AtFork qw/pthread_atfork/;
 use Scalar::Util qw/refaddr weaken/;
 use Signal::Mask;
 
@@ -205,7 +204,6 @@ my $child_handler = sub {
 };
 add_signal('CHLD', $child_handler);
 
-pthread_atfork(undef, undef, \&CLONE);
 fieldhash my %idle_handlers;
 
 sub add_idle {

@@ -24,34 +24,25 @@ my $no_child        = 0;
 
 fieldhash my %data_for_fh;
 fieldhash my %mode_for;
+fieldhash my %callback_for;
 
 my $reset_mode = sub {
 	my $fh = shift;
 	$mode_for{$fh} = [ uniq( map { @{ $_->[0] } } values %{ $data_for_fh{$fh} } ) ];
-	$epoll->modify(
-		$fh, $mode_for{$fh},
-		sub {
-			my $event = shift;
-			for my $callback (values %{ $data_for_fh{$fh} }) {
-				$callback->[1]->($event) if $event ~~ $callback->[0];
-			}
-		}
-	);
+	$epoll->modify($fh, $mode_for{$fh}, $callback_for{$fh});
 	return;
 };
 
 my $real_add = sub {
 	my ($fh, $mode) = @_;
 	my %data;
-	$epoll->add(
-		$fh, $mode,
-		sub {
-			my $event = shift;
-			for my $callback (values %data) {
-				$callback->[1]->($event) if $event ~~ $callback->[0];
-			}
+	$callback_for{$fh} = sub {
+		my $event = shift;
+		for my $callback (values %data) {
+			$callback->[1]->($event) if $event ~~ $callback->[0];
 		}
-	);
+	};
+	$epoll->add($fh, $mode, $callback_for{$fh});
 	return \%data;
 };
 
@@ -90,6 +81,8 @@ sub remove_fh {
 	if (not keys %{ $data_for_fh{$fh} }) {
 		$epoll->delete($fh);
 		delete $data_for_fh{$fh};
+		delete $mode_for{$fh};
+		delete $callback_for{$fh};
 	}
 	return;
 }
@@ -162,25 +155,6 @@ sub remove_signal {
 	$Signal::Mask{$signal} = 0;
 	return;
 }
-
-sub CLONE {
-	$epoll->close or die;
-	$epoll = Linux::Epoll->new;
-	for my $key (keys %data_for_fh) {
-		my $fh   = id_2obj($key);
-		my $mode = event_bits_to_names($mode_for{$fh});
-		$real_add->($fh, $mode);
-	}
-	for my $addr (keys %data_for_timer) {
-	}
-	for my $signame (keys %data_for_signal) {
-		my (undef, $callback, $signal) = @{ $data_for_signal{$signame} };
-		my $signalfd = signalfd($signame);
-		$signalfd->blocking(0);
-		$data_for_signal{$signame}[0] = $signalfd;
-		$epoll->add($signalfd, 'in', $callback);
-	}
-};
 
 my %child_handler_for;
 

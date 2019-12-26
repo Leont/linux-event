@@ -9,6 +9,7 @@ use Carp qw/croak/;
 use Hash::Util::FieldHash qw/fieldhash id_2obj/;
 use Linux::Epoll;
 use Linux::FD qw/signalfd timerfd/;
+use Linux::FD::Pid;
 use List::Util qw/reduce/;
 use List::MoreUtils qw/uniq/;
 use POSIX qw/WNOHANG/;
@@ -161,23 +162,20 @@ my %child_handler_for;
 
 sub add_child {
 	my ($pid, $cb) = @_;
-	$child_handler_for{$pid} = $cb;
+	$child_handler_for{$pid} //= Linux::FD::Pid->new($pid);
+	add_fh($child_handler_for{$pid}, sub {
+		waitpid $pid, WNOHANG;
+		$cb->();
+	});
 	return;
 }
+$Signal::Mask{CHLD} = 1;
 
 sub remove_child {
 	my $pid = shift;
 	delete $child_handler_for{$pid};
 	return;
 }
-
-my $child_handler = sub {
-	while ((my $pid = waitpid $any_child, WNOHANG) > $no_child) {
-		(delete $child_handler_for{$pid})->() if exists $child_handler_for{$pid};
-	}
-	return;
-};
-add_signal('CHLD', $child_handler);
 
 fieldhash my %idle_handlers;
 

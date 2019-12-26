@@ -1,8 +1,9 @@
 package Linux::Event;
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings FATAL => 'all';
+use experimental 'smartmatch';
 
 use Carp qw/croak/;
 use Hash::Util::FieldHash qw/fieldhash id_2obj/;

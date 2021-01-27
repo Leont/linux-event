@@ -233,6 +233,8 @@ This module is an expermental event loop for modern versions of Linux (2.6.27 or
 
 =item * add_fh($fh, $mode, $callback)
 
+=item * modify_fh($fh, $addr, $mode, $callback)
+
 =item * remove_fh($fh)
 
 =item * add_child($pid, $callback)
@@ -253,7 +255,9 @@ This module is an expermental event loop for modern versions of Linux (2.6.27 or
 
 =item * remove_idle($callback)
 
-=item * one_shot($maxevents = 1)
+=item * one_shot($max_events = 1)
+
+=item * maybe_shot($max_events = 1)
 
 =back
 

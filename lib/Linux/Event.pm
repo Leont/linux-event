@@ -139,7 +139,7 @@ sub add_signal {
 	my $signalfd = signalfd($signal);
 	$signalfd->blocking(0);
 	my $callback = sub {
-		my $arg = $data_for_signal{$signal}->receive;
+		my $arg = $data_for_signal{$signal}[0]->receive;
 		$cb->($arg) if defined $arg;
 	};
 	$epoll->add($signalfd, 'in', $callback);

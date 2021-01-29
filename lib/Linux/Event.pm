@@ -33,16 +33,14 @@ my $reset_mode = sub {
 	return;
 };
 
-my $real_add = sub {
-	my ($fh, $mode, $data) = @_;
-	$data_for_fh{$fh}{callback} = sub {
+my $callback_for = sub {
+	my $data = shift;
+	return sub {
 		my $event = shift;
 		for my $callback (values %{ $data }) {
 			$callback->{callback}->($event) if $event ~~ $callback->{mode};
 		}
-	};
-	$epoll->add($fh, $mode, $data_for_fh{$fh}{callback});
-	return;
+	}
 };
 
 sub add_fh {
@@ -52,8 +50,9 @@ sub add_fh {
 	my @mode = ref $mode ? sort @$mode : $mode;
 	if (!exists $data_for_fh{$fh}) {
 		$data_for_fh{$fh}{id}{$addr} = { mode => \@mode, callback => $cb };
-		$real_add->($fh, \@mode, $data_for_fh{$fh}{id});
 		$data_for_fh{$fh}{mode} = \@mode;
+		$data_for_fh{$fh}{callback} = $callback_for->($data_for_fh{$fh}{id});
+		$epoll->add($fh, $mode, $data_for_fh{$fh}{callback});
 	}
 	else {
 		$data_for_fh{$fh}{id}{$addr} = { mode => \@mode, callback => $cb };
@@ -68,6 +67,9 @@ sub remove_fh {
 	if (not keys %{ $data_for_fh{$fh}{id} }) {
 		$epoll->delete($fh);
 		delete $data_for_fh{$fh};
+	}
+	else {
+		$reset_mode->($fh);
 	}
 	return 1;
 }

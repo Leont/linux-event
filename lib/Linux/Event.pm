@@ -62,17 +62,6 @@ sub add_fh {
 	return $addr;
 }
 
-sub modify_fh {
-	my ($fh, $addr, $mode, $cb) = @_;
-	my @mode = ref $mode ? sort @$mode : $mode;
-	if (! exists $data_for_fh{$fh} || ! exists $data_for_fh{$fh}{id}{$addr}) {
-		croak "Can't modify $addr: no such entry";
-	}
-	$data_for_fh{$fh}{id}{$addr} = { mode => \@mode, callback => $cb };
-	$reset_mode->($fh) unless join(',', @mode) eq join(',', @{ $data_for_fh{$fh}{mode} });
-	return $addr;
-}
-
 sub remove_fh {
 	my ($fh, $addr) = @_;
 	return if not delete $data_for_fh{$fh}{id}{$addr};
@@ -80,7 +69,7 @@ sub remove_fh {
 		$epoll->delete($fh);
 		delete $data_for_fh{$fh};
 	}
-	return;
+	return 1;
 }
 
 my %data_for_timer;
@@ -226,8 +215,6 @@ This module is an expermental event loop for modern versions of Linux (2.6.27 or
 =over 4
 
 =item * add_fh($fh, $mode, $callback)
-
-=item * modify_fh($fh, $addr, $mode, $callback)
 
 =item * remove_fh($fh)
 

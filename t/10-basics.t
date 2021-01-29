@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 21;
+use Test::More tests => 23;
 use Linux::Event;
 
 use POSIX qw/raise SIGALRM/;
@@ -45,7 +45,10 @@ my $sub2 = sub {
 	is sysread($in, my $buffer, 3), 3, 'Got 3 more bytes';
 };
 
-ok(Linux::Event::modify_fh($in, $addr, [ qw/in prio/ ], $sub2), 'Can modify the set');
+my $addr2 = Linux::Event::add_fh($in, [ qw/in prio/ ], $sub2);
+ok($addr2, 'Can add handler to existing handle');
+ok(Linux::Event::remove_fh($in, $addr), 'Can remove handler from handle');
+ok !defined $sub, '$sub is no longer defined';
 weaken $sub2;
 ok defined $sub2, '$sub2 is still defined';
 is Linux::Event::maybe_shot(2), 1, 'Interrupted event';
@@ -53,7 +56,7 @@ is $subnum, 3, 'subnum is 3';
 is Linux::Event::maybe_shot(1), 1, 'Yet another event';
 is $subnum, 4, 'subnum is 4';
 
-Linux::Event::remove_fh($in, $addr);
+Linux::Event::remove_fh($in, $addr2);
 ok 1, 'Can delete from set';
 ok !defined $sub2, '$sub2 is no longer defined';
 

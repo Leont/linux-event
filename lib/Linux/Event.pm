@@ -26,16 +26,6 @@ my $no_child        = 0;
 
 fieldhash my %data_for_fh;
 
-my $callback_for = sub {
-	my $data = shift;
-	return sub {
-		my $event = shift;
-		for my $callback (values %{ $data }) {
-			$callback->{callback}->($event) if $event ~~ $callback->{mode};
-		}
-	}
-};
-
 sub add_fh {
 	my ($fh, $mode, $cb) = @_;
 	weaken $fh;
@@ -44,12 +34,17 @@ sub add_fh {
 	if (!exists $data_for_fh{$fh}) {
 		$data_for_fh{$fh}{id}{$addr} = { mode => \@mode, callback => $cb };
 		$data_for_fh{$fh}{mode} = \@mode;
-		$data_for_fh{$fh}{callback} = $callback_for->($data_for_fh{$fh}{id});
-		$epoll->add($fh, $mode, $data_for_fh{$fh}{callback});
+		$epoll->add($fh, $mode, $cb);
 	}
 	else {
 		$data_for_fh{$fh}{id}{$addr} = { mode => \@mode, callback => $cb };
 		$data_for_fh{$fh}{mode} = [ uniq( map { @{ $_->{mode} } } values %{ $data_for_fh{$fh}{id} } ) ];
+		$data_for_fh{$fh}{callback} //= sub {
+			my $event = shift;
+			for my $callback (values %{ $data_for_fh{$fh}{id} }) {
+				$callback->{callback}->($event) if $event ~~ $callback->{mode};
+			}
+		};
 		$epoll->modify($fh, $data_for_fh{$fh}{mode}, $data_for_fh{$fh}{callback});
 	}
 	return $addr;
@@ -58,12 +53,18 @@ sub add_fh {
 sub remove_fh {
 	my ($fh, $addr) = @_;
 	return if not delete $data_for_fh{$fh}{id}{$addr};
-	if (not keys %{ $data_for_fh{$fh}{id} }) {
+	my @values = values %{ $data_for_fh{$fh}{id} };
+	if (not @values) {
 		$epoll->delete($fh);
 		delete $data_for_fh{$fh};
 	}
+	elsif (@values == 1) {
+		$data_for_fh{$fh}{mode} = $values[0]{mode};
+		$epoll->modify($fh, $data_for_fh{$fh}{mode}, $values[0]{callback});
+		delete $data_for_fh{$fh}{callback};
+	}
 	else {
-		$data_for_fh{$fh}{mode} = [ uniq( map { @{ $_->{mode} } } values %{ $data_for_fh{$fh}{id} } ) ];
+		$data_for_fh{$fh}{mode} = [ uniq( map { @{ $_->{mode} } } @values ) ];
 		$epoll->modify($fh, $data_for_fh{$fh}{mode}, $data_for_fh{$fh}{callback});
 	}
 	return 1;

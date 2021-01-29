@@ -25,27 +25,24 @@ my $any_child       = -1;
 my $no_child        = 0;
 
 fieldhash my %data_for_fh;
-fieldhash my %mode_for;
-fieldhash my %callback_for;
 
 my $reset_mode = sub {
 	my $fh = shift;
-	$mode_for{$fh} = [ uniq( map { @{ $_->[0] } } values %{ $data_for_fh{$fh} } ) ];
-	$epoll->modify($fh, $mode_for{$fh}, $callback_for{$fh});
+	$data_for_fh{$fh}{mode} = [ uniq( map { @{ $_->{mode} } } values %{ $data_for_fh{$fh}{id} } ) ];
+	$epoll->modify($fh, $data_for_fh{$fh}{mode}, $data_for_fh{$fh}{callback});
 	return;
 };
 
 my $real_add = sub {
-	my ($fh, $mode) = @_;
-	my %data;
-	$callback_for{$fh} = sub {
+	my ($fh, $mode, $data) = @_;
+	$data_for_fh{$fh}{callback} = sub {
 		my $event = shift;
-		for my $callback (values %data) {
-			$callback->[1]->($event) if $event ~~ $callback->[0];
+		for my $callback (values %{ $data }) {
+			$callback->{callback}->($event) if $event ~~ $callback->{mode};
 		}
 	};
-	$epoll->add($fh, $mode, $callback_for{$fh});
-	return \%data;
+	$epoll->add($fh, $mode, $data_for_fh{$fh}{callback});
+	return;
 };
 
 sub add_fh {
@@ -54,37 +51,34 @@ sub add_fh {
 	my $addr = refaddr($cb);
 	my @mode = ref $mode ? sort @$mode : $mode;
 	if (!exists $data_for_fh{$fh}) {
-		$data_for_fh{$fh} = $real_add->($fh, \@mode);
-		$data_for_fh{$fh}{$addr} = [ \@mode, $cb ];
-		weaken $data_for_fh{$fh};
-		$mode_for{$fh} = \@mode;
+		$data_for_fh{$fh}{id}{$addr} = { mode => \@mode, callback => $cb };
+		$real_add->($fh, \@mode, $data_for_fh{$fh}{id});
+		$data_for_fh{$fh}{mode} = \@mode;
 	}
 	else {
-		$data_for_fh{$fh}{$addr} = [ \@mode, $cb ];
-		$reset_mode->($fh) unless join(',', @$mode) eq join(',', @{ $mode_for{$fh} });
+		$data_for_fh{$fh}{id}{$addr} = { mode => \@mode, callback => $cb };
+		$reset_mode->($fh) unless join(',', @mode) eq join(',', @{ $data_for_fh{$fh}{mode} });
 	}
 	return $addr;
 }
 
 sub modify_fh {
 	my ($fh, $addr, $mode, $cb) = @_;
-	$mode = ref $mode ? $mode : [ $mode ];
-	if (! exists $data_for_fh{$fh} || ! exists $data_for_fh{$fh}{$addr}) {
+	my @mode = ref $mode ? sort @$mode : $mode;
+	if (! exists $data_for_fh{$fh} || ! exists $data_for_fh{$fh}{id}{$addr}) {
 		croak "Can't modify $addr: no such entry";
 	}
-	$data_for_fh{$fh}{$addr} = [ $mode, $cb ];
-	$reset_mode->($fh) unless join(',', @$mode) eq join(',', @{ $mode_for{$fh} });
+	$data_for_fh{$fh}{id}{$addr} = { mode => \@mode, callback => $cb };
+	$reset_mode->($fh) unless join(',', @mode) eq join(',', @{ $data_for_fh{$fh}{mode} });
 	return $addr;
 }
 
 sub remove_fh {
 	my ($fh, $addr) = @_;
-	return if not delete $data_for_fh{$fh}{$addr};
-	if (not keys %{ $data_for_fh{$fh} }) {
+	return if not delete $data_for_fh{$fh}{id}{$addr};
+	if (not keys %{ $data_for_fh{$fh}{id} }) {
 		$epoll->delete($fh);
 		delete $data_for_fh{$fh};
-		delete $mode_for{$fh};
-		delete $callback_for{$fh};
 	}
 	return;
 }

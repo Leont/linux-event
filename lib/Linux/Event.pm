@@ -26,13 +26,6 @@ my $no_child        = 0;
 
 fieldhash my %data_for_fh;
 
-my $reset_mode = sub {
-	my $fh = shift;
-	$data_for_fh{$fh}{mode} = [ uniq( map { @{ $_->{mode} } } values %{ $data_for_fh{$fh}{id} } ) ];
-	$epoll->modify($fh, $data_for_fh{$fh}{mode}, $data_for_fh{$fh}{callback});
-	return;
-};
-
 my $callback_for = sub {
 	my $data = shift;
 	return sub {
@@ -56,7 +49,8 @@ sub add_fh {
 	}
 	else {
 		$data_for_fh{$fh}{id}{$addr} = { mode => \@mode, callback => $cb };
-		$reset_mode->($fh) unless join(',', @mode) eq join(',', @{ $data_for_fh{$fh}{mode} });
+		$data_for_fh{$fh}{mode} = [ uniq( map { @{ $_->{mode} } } values %{ $data_for_fh{$fh}{id} } ) ];
+		$epoll->modify($fh, $data_for_fh{$fh}{mode}, $data_for_fh{$fh}{callback});
 	}
 	return $addr;
 }
@@ -69,7 +63,8 @@ sub remove_fh {
 		delete $data_for_fh{$fh};
 	}
 	else {
-		$reset_mode->($fh);
+		$data_for_fh{$fh}{mode} = [ uniq( map { @{ $_->{mode} } } values %{ $data_for_fh{$fh}{id} } ) ];
+		$epoll->modify($fh, $data_for_fh{$fh}{mode}, $data_for_fh{$fh}{callback});
 	}
 	return 1;
 }

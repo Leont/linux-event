@@ -12,7 +12,6 @@ use Linux::FD qw/signalfd timerfd/;
 use Linux::FD::Pid;
 use List::Util qw/reduce/;
 use List::MoreUtils qw/uniq/;
-use POSIX qw/WNOHANG/;
 use Scalar::Util qw/refaddr weaken/;
 use Signal::Mask;
 
@@ -143,10 +142,10 @@ my %child_handler_for;
 
 sub add_child {
 	my ($pid, $cb) = @_;
-	$child_handler_for{$pid} //= Linux::FD::Pid->new($pid);
-	add_fh($child_handler_for{$pid}, sub {
-		waitpid $pid, WNOHANG;
-		$cb->();
+	$child_handler_for{$pid} = Linux::FD::Pid->new($pid);
+	$epoll->add($child_handler_for{$pid}, 'in', sub {
+		$cb->($child_handler_for{$pid}->wait);
+		$epoll->delete(delete $child_handler_for{$pid});
 	});
 	return;
 }
@@ -154,7 +153,7 @@ $Signal::Mask{CHLD} = 1;
 
 sub remove_child {
 	my $pid = shift;
-	delete $child_handler_for{$pid};
+	$epoll->delete(delete $child_handler_for{$pid});
 	return;
 }
 

@@ -98,7 +98,7 @@ sub remove_timer {
 	my $addr = shift;
 	return if not exists $data_for_timer{$addr};
 	my $data = delete $data_for_timer{$addr};
-	$epoll->remove($data->[0]);
+	$epoll->delete($data->[0]);
 	return;
 }
 
@@ -133,7 +133,7 @@ sub remove_signal {
 	my $signal = shift;
 	return if not exists $data_for_signal{$signal};
 	my $data = delete $data_for_signal{$signal};
-	$epoll->remove($data->[0]);
+	$epoll->delete($data->[0]);
 	$Signal::Mask{$signal} = 0;
 	return;
 }

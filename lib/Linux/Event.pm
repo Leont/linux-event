@@ -157,7 +157,7 @@ sub remove_child {
 	return;
 }
 
-fieldhash my %idle_handlers;
+my %idle_handlers;
 
 sub add_idle {
 	my $cb   = shift;

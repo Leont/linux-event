@@ -149,7 +149,6 @@ sub add_child {
 	});
 	return;
 }
-$Signal::Mask{CHLD} = 1;
 
 sub remove_child {
 	my $pid = shift;

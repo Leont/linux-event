@@ -75,8 +75,7 @@ sub add_timer {
 	my ($after, $interval, $cb, $keepalive) = @_;
 	$keepalive //= defined wantarray;
 
-	my $timer = timerfd('monotonic');
-	$timer->blocking(0);
+	my $timer = timerfd('monotonic', 'non-blocking');
 	$timer->set_timeout($after, $interval);
 
 	my $addr     = refaddr $timer;
@@ -116,8 +115,7 @@ my %data_for_signal;
 sub add_signal {
 	my ($signal, $cb) = @_;
 	croak '$signal must be a name or a POSIX::SigSet object' if ref $signal and not $signal->isa('POSIX::SigSet');
-	my $signalfd = signalfd($signal);
-	$signalfd->blocking(0);
+	my $signalfd = signalfd($signal, 'non-blocking');
 	my $callback = sub {
 		my $arg = $data_for_signal{$signal}[0]->receive;
 		$cb->($arg) if defined $arg;

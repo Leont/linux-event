@@ -13,13 +13,12 @@ use POSIX::RT::Timer;
 use Signal::Mask;
 use Socket;
 use Time::HiRes 'time';
-use POSIX qw/sigsuspend SIGUSR1 SIGUSR2 SIGALRM SIGPOLL/;
+use POSIX qw/sigsuspend SIGUSR1 SIGUSR2 SIGALRM/;
 
 my $nr = $ARGV[0] || 1000;
 
 $| = 1;
 
-print "name $ENV{PERL_ANYEVENT_MODEL}\n";
 print "sockets ", $nr * 2, "\n";
 
 my $count;
@@ -28,7 +27,7 @@ my $c = time;
 
 $Signal::Mask{IO} = 1;
 $Signal::Mask{USR2} = 1;
-$SIG{POLL} = sub { die "HERE" };
+$SIG{IO} = sub { die "HERE" };
 my %handle_for;
 my %timer_for;
 
@@ -55,7 +54,7 @@ for (1 .. $ARGV[1] || $nr * 0.01) {
 	syswrite $conn[rand @conn], $_, 1;
 }
 
-$SIG{POLL} = sub { die "HERE" };
+$SIG{IO} = sub { die "HERE" };
 my $mask = POSIX::SigSet->new();
 
 my $timeout = POSIX::RT::Timer->new(clock => 'monotonic', signal => SIGALRM, value => 1);

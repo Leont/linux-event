@@ -13,13 +13,12 @@ use POSIX::RT::Timer;
 use Signal::Mask;
 use Socket;
 use Time::HiRes 'time';
-use POSIX qw/SIGUSR1 SIGUSR2 SIGALRM SIGPOLL/;
+use POSIX qw/SIGUSR1 SIGUSR2 SIGALRM/;
 
 my $nr = $ARGV[0] || 1000;
 
 $| = 1;
 
-print "name $ENV{PERL_ANYEVENT_MODEL}\n";
 print "sockets ", $nr * 2, "\n";
 
 my $count;
@@ -29,7 +28,7 @@ my $c = time;
 $Signal::Mask{IO} = 1;
 $Signal::Mask{USR2} = 1;
 $SIG{USR1} = sub { die };
-$SIG{POLL} = sub { die };
+$SIG{IO} = sub { die };
 my %handle_for;
 my %timer_for;
 
@@ -38,7 +37,7 @@ my @conn; @conn = map {
 	my $timer = POSIX::RT::Timer->new(clock => 'monotonic', value => 3600, signal => SIGUSR1);
 
 	fcntl $in, F_SETOWN, 0+$$ or die;
-	fcntl $in, F_SETSIG, 0+sig_num('USR2') or die "Couldn't SETSIG: $!";
+	fcntl $in, F_SETSIG, SIGUSR2 or die "Couldn't SETSIG: $!";
 	my $flags = fcntl $in, F_GETFL, 0 or die;
 	$flags |= O_NONBLOCK|O_ASYNC;
 	fcntl $in, F_SETFL, $flags or die;
@@ -57,7 +56,7 @@ for (1 .. $num) {
 	syswrite $conn[rand @conn], $_, 1;
 }
 
-$SIG{POLL} = sub { die "HERE" };
+$SIG{IO} = sub { die "HERE" };
 my $set = POSIX::SigSet->new(SIGUSR2);
 
 my $timeout = POSIX::RT::Timer->new(clock => 'monotonic', signal => SIGALRM, value => 1);

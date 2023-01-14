@@ -6,11 +6,10 @@ use warnings;
 use experimental 'smartmatch';
 
 use Carp qw/croak/;
-use Hash::Util::FieldHash qw/fieldhash id_2obj/;
+use Hash::Util qw/fieldhash/;
 use Linux::Epoll;
 use Linux::FD qw/signalfd timerfd/;
 use Linux::FD::Pid;
-use List::Util qw/reduce/;
 use List::MoreUtils qw/uniq/;
 use Scalar::Util qw/refaddr weaken/;
 use Signal::Mask;

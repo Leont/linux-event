@@ -13,7 +13,7 @@ use POSIX::RT::Timer;
 use Signal::Mask;
 use Socket;
 use Time::HiRes 'time';
-use POSIX qw/SIGUSR1 SIGUSR2 SIGALRM/;
+use POSIX qw/SIGUSR1 SIGALRM/;
 
 my $nr = $ARGV[0] || 1000;
 
@@ -26,18 +26,19 @@ my $count;
 my $c = time;
 
 $Signal::Mask{IO} = 1;
-$Signal::Mask{USR2} = 1;
 $SIG{USR1} = sub { die };
-$SIG{IO} = sub { die };
 my %handle_for;
 my %timer_for;
+
+my $pid = 0 + $$;
+my $sigio = 0 + sig_num('IO');
 
 my @conn; @conn = map {
 	socketpair my $in, my $out, AF_UNIX, SOCK_STREAM, 0 or die "Can't open socketpair: $!";
 	my $timer = POSIX::RT::Timer->new(clock => 'monotonic', value => 3600, signal => SIGUSR1);
 
-	fcntl $in, F_SETOWN, 0+$$ or die;
-	fcntl $in, F_SETSIG, SIGUSR2 or die "Couldn't SETSIG: $!";
+	fcntl $in, F_SETOWN, $pid or die;
+	fcntl $in, F_SETSIG, $sigio or die "Couldn't SETSIG: $!";
 	my $flags = fcntl $in, F_GETFL, 0 or die;
 	$flags |= O_NONBLOCK|O_ASYNC;
 	fcntl $in, F_SETFL, $flags or die;
@@ -56,8 +57,7 @@ for (1 .. $num) {
 	syswrite $conn[rand @conn], $_, 1;
 }
 
-$SIG{IO} = sub { die "HERE" };
-my $set = POSIX::SigSet->new(SIGUSR2);
+my $set = POSIX::SigSet->new(sig_num('IO'));
 
 my $timeout = POSIX::RT::Timer->new(clock => 'monotonic', signal => SIGALRM, value => 1);
 my $i = time;

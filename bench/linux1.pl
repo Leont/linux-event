@@ -10,7 +10,7 @@ use Socket;
 use Time::HiRes 'time';
 
 my $nr = shift || 1000;
-my $sim = shift || 3;
+my $num = shift || $nr * 0.01;
 
 $| = 1;
 
@@ -40,7 +40,7 @@ $c = (time - $c) / $nr * 1e6;
 
 printf "create %.2f us\n", $c;
 
-for (1 .. $ARGV[1] || $nr * 0.01) {
+for (1 .. $num) {
 	syswrite $conn[rand @conn], $_, 1;
 }
 
@@ -55,4 +55,4 @@ $loop->add($timeout, 'in', sub {
 	exit;
 });
 
-1 while $loop->wait($sim);
+1 while $loop->wait($num);

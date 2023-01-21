@@ -57,6 +57,6 @@ $SIG{ALRM} = sub {
 	printf "request %.2f us\n", $i;
 	exit;
 };
-alarm 2;
+alarm 1;
 
 $loop->run;

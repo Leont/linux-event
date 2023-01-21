@@ -13,7 +13,8 @@ use Socket;
 use Time::HiRes 'time';
 use POSIX qw/SIGUSR1 SIGUSR2/;
 
-my $nr = $ARGV[0] || 1000;
+my $nr = shift || 1000;
+my $num = shift || $nr * 0.01;
 
 $| = 1;
 
@@ -43,7 +44,6 @@ $c = (time - $c) / $nr * 1e6;
 
 printf "create %.2f us\n", $c;
 
-my $num = $ARGV[1] || $nr * 0.01;
 for (1 .. $num) {
 	syswrite $conn[rand @conn], $_, 1;
 }

@@ -14,7 +14,7 @@ $| = 1;
 
 print "sockets ", $nr * 2, "\n";
 
-my $count;
+my $count = 1;
 
 my $c = time;
 

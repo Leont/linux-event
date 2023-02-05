@@ -1,0 +1,12 @@
+requires 'EV';
+requires 'AnyEvent';
+requires 'Mojo::IOLoop';
+requires 'IO::Async';
+requires 'IO::Async::Loop::Epoll';
+requires 'Linux::FD';
+requires 'POSIX::RT::Timer';
+requires 'UV';
+requires 'Signal::Mask';
+requires 'Linux::FD::Pid';
+requires 'POSIX::RT::Signal';
+requires 'Signal::Unsafe';
